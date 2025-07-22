@@ -1,168 +1,92 @@
-export interface ChatModel {
-  id: string
-  name: string
-  provider: string
-  providerId: string
-  hostedId: string
-  platformLink: string
-  imageInput: boolean
-  pricing: {
-    currency: string
-    unit: string
-    inputCost: number
-    outputCost: number
-  }
-}
+import { deepseek } from "@ai-sdk/deepseek"
+import { groq } from "@ai-sdk/groq"
+import { togetherai } from "@ai-sdk/togetherai"
+import { google } from "@ai-sdk/google"
 
-export const models: ChatModel[] = [
-  {
-    id: "gpt-4o",
-    name: "GPT-4o",
-    provider: "OpenAI",
-    providerId: "openai",
-    hostedId: "gpt-4o",
-    platformLink: "https://platform.openai.com/docs/models/gpt-4o",
-    imageInput: true,
-    pricing: {
-      currency: "USD",
-      unit: "1M tokens",
-      inputCost: 2.5,
-      outputCost: 10,
-    },
+export const AI_MODELS = {
+  // DeepSeek Models - استخدام النماذج الصحيحة
+  "deepseek-chat": {
+    id: "deepseek-chat",
+    name: "DeepSeek Chat",
+    provider: "deepseek",
+    model: deepseek("deepseek-chat"),
+    maxTokens: 4096,
+    supportsImages: false,
+    supportsTools: true,
   },
-  {
-    id: "gpt-4o-mini",
-    name: "GPT-4o Mini",
-    provider: "OpenAI",
-    providerId: "openai",
-    hostedId: "gpt-4o-mini",
-    platformLink: "https://platform.openai.com/docs/models/gpt-4o-mini",
-    imageInput: true,
-    pricing: {
-      currency: "USD",
-      unit: "1M tokens",
-      inputCost: 0.15,
-      outputCost: 0.6,
-    },
+  "deepseek-reasoner": {
+    id: "deepseek-reasoner",
+    name: "DeepSeek Reasoner",
+    provider: "deepseek",
+    model: deepseek("deepseek-reasoner"),
+    maxTokens: 4096,
+    supportsImages: false,
+    supportsTools: true,
   },
-  {
-    id: "o1-preview",
-    name: "O1 Preview",
-    provider: "OpenAI",
-    providerId: "openai",
-    hostedId: "o1-preview",
-    platformLink: "https://platform.openai.com/docs/models/o1",
-    imageInput: false,
-    pricing: {
-      currency: "USD",
-      unit: "1M tokens",
-      inputCost: 15,
-      outputCost: 60,
-    },
+
+  // Groq Models - النماذج المتاحة الصحيحة
+  "llama-3.3-70b-versatile": {
+    id: "llama-3.3-70b-versatile",
+    name: "Llama 3.3 70B Versatile",
+    provider: "groq",
+    model: groq("llama-3.3-70b-versatile"),
+    maxTokens: 8192,
+    supportsImages: false,
+    supportsTools: true,
   },
-  {
-    id: "claude-3-5-sonnet-20241022",
-    name: "Claude 3.5 Sonnet",
-    provider: "Anthropic",
-    providerId: "anthropic",
-    hostedId: "claude-3-5-sonnet-20241022",
-    platformLink: "https://docs.anthropic.com/claude/docs/models-overview",
-    imageInput: true,
-    pricing: {
-      currency: "USD",
-      unit: "1M tokens",
-      inputCost: 3,
-      outputCost: 15,
-    },
+  "qwen-qwq-32b": {
+    id: "qwen-qwq-32b",
+    name: "Qwen QwQ 32B",
+    provider: "groq",
+    model: groq("qwen-qwq-32b"),
+    maxTokens: 8192,
+    supportsImages: false,
+    supportsTools: true,
   },
-  {
+
+  // Together AI Models - النماذج الصحيحة
+  "deepseek-ai/DeepSeek-V3": {
+    id: "deepseek-ai/DeepSeek-V3",
+    name: "DeepSeek V3 (Together)",
+    provider: "together",
+    model: togetherai("deepseek-ai/DeepSeek-V3"),
+    maxTokens: 4096,
+    supportsImages: false,
+    supportsTools: true,
+  },
+
+  // Google Gemini Models - النماذج المتاحة
+  "gemini-1.5-pro": {
     id: "gemini-1.5-pro",
     name: "Gemini 1.5 Pro",
-    provider: "Google",
-    providerId: "google",
-    hostedId: "gemini-1.5-pro",
-    platformLink: "https://ai.google.dev/models/gemini",
-    imageInput: true,
-    pricing: {
-      currency: "USD",
-      unit: "1M tokens",
-      inputCost: 1.25,
-      outputCost: 5,
-    },
+    provider: "google",
+    model: google("gemini-1.5-pro"),
+    maxTokens: 8192,
+    supportsImages: true,
+    supportsTools: true,
   },
-  {
-    id: "llama-3.1-70b-versatile",
-    name: "Llama 3.1 70B",
-    provider: "Groq",
-    providerId: "groq",
-    hostedId: "llama-3.1-70b-versatile",
-    platformLink: "https://console.groq.com/docs/models",
-    imageInput: false,
-    pricing: {
-      currency: "USD",
-      unit: "1M tokens",
-      inputCost: 0.59,
-      outputCost: 0.79,
-    },
+  "gemini-1.5-flash": {
+    id: "gemini-1.5-flash",
+    name: "Gemini 1.5 Flash",
+    provider: "google",
+    model: google("gemini-1.5-flash"),
+    maxTokens: 8192,
+    supportsImages: true,
+    supportsTools: true,
   },
-  {
-    id: "grok-beta",
-    name: "Grok Beta",
-    provider: "xAI",
-    providerId: "xai",
-    hostedId: "grok-beta",
-    platformLink: "https://docs.x.ai/",
-    imageInput: false,
-    pricing: {
-      currency: "USD",
-      unit: "1M tokens",
-      inputCost: 5,
-      outputCost: 15,
-    },
-  },
-]
+} as const
 
-// Helper functions
-export function getModelById(id: string): ChatModel | undefined {
-  return models.find((model) => model.id === id)
+export type ModelId = keyof typeof AI_MODELS
+
+export function getModel(modelId: ModelId) {
+  return AI_MODELS[modelId]
 }
 
-export function getModelsByProvider(providerId: string): ChatModel[] {
-  return models.filter((model) => model.providerId === providerId)
+export function getAvailableModels() {
+  return Object.values(AI_MODELS)
 }
 
-export function getDefaultModel(): ChatModel {
-  return models[0]
-}
-
-export function isValidModelId(id: string): boolean {
-  return models.some((model) => model.id === id)
-}
-
-export function getModelPricing(id: string): ChatModel["pricing"] | null {
-  const model = getModelById(id)
-  return model ? model.pricing : null
-}
-
-export function getModelsWithImageSupport(): ChatModel[] {
-  return models.filter((model) => model.imageInput)
-}
-
-export function getProviders(): string[] {
-  return [...new Set(models.map((model) => model.provider))]
-}
-
-// Export types
-export type { ChatModel }
-
-// Default export
-export default {
-  models,
-  getModelById,
-  getModelsByProvider,
-  getDefaultModel,
-  isValidModelId,
-  getModelPricing,
-  getModelsWithImageSupport,
-  getProviders,
+// دالة للحصول على النماذج حسب المزود
+export function getModelsByProvider(provider: string) {
+  return Object.values(AI_MODELS).filter((model) => model.provider === provider)
 }

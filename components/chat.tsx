@@ -1,192 +1,145 @@
 "use client"
 
+import { useState } from "react"
 import { useChat } from "ai/react"
-import { useEffect, useState } from "react"
-import useSWR, { useSWRConfig } from "swr"
-import { ChatHeader } from "@/components/chat-header"
-import type { Vote } from "@/lib/db/schema"
-import { fetcher, generateUUID } from "@/lib/utils"
-import { Artifact } from "./artifact"
-import { MultimodalInput } from "./multimodal-input"
-import { Messages } from "./messages"
-import type { VisibilityType } from "./visibility-selector"
-import { useArtifactSelector } from "@/hooks/use-artifact"
-import { unstable_serialize } from "swr/infinite"
-import { getChatHistoryPaginationKey } from "./sidebar-history"
-import { toast } from "./toast"
-import type { Session } from "next-auth"
-import { useSearchParams } from "next/navigation"
-import { useChatVisibility } from "@/hooks/use-chat-visibility"
-import { useAutoResume } from "@/hooks/use-auto-resume"
-import { ChatSDKError } from "@/lib/errors"
-import type { Attachment, ChatMessage } from "@/lib/types"
-import { useDataStream } from "./data-stream-provider"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModelSelector } from "@/components/model-selector"
+import type { ModelId } from "@/lib/ai/models"
+import { Send, Bot, User, Sparkles, Moon, Sun, AlertCircle } from "lucide-react"
+import { useTheme } from "next-themes"
+import { toast } from "@/hooks/use-toast"
 
-export function Chat({
-  id,
-  initialMessages,
-  initialChatModel,
-  initialVisibilityType,
-  isReadonly,
-  session,
-  autoResume,
-}: {
-  id: string
-  initialMessages: ChatMessage[]
-  initialChatModel: string
-  initialVisibilityType: VisibilityType
-  isReadonly: boolean
-  session: Session
-  autoResume: boolean
-}) {
-  const { visibilityType } = useChatVisibility({
-    chatId: id,
-    initialVisibilityType,
-  })
+export function Chat() {
+  const [selectedModel, setSelectedModel] = useState<ModelId>("deepseek-chat")
+  const { theme, setTheme } = useTheme()
 
-  const { mutate } = useSWRConfig()
-  const { setDataStream } = useDataStream()
-
-  const [input, setInput] = useState<string>("")
-
-  const { messages, setMessages, append, isLoading, stop, reload } = useChat({
-    id,
-    initialMessages,
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: "/api/chat",
     body: {
-      id,
-      selectedChatModel: initialChatModel,
-      selectedVisibilityType: visibilityType,
-    },
-    onResponse: (response) => {
-      if (!response.ok) {
-        toast({
-          type: "error",
-          description: "Failed to send message",
-        })
-      }
-    },
-    onFinish: () => {
-      mutate(unstable_serialize(getChatHistoryPaginationKey))
+      model: selectedModel,
     },
     onError: (error) => {
-      if (error instanceof ChatSDKError) {
-        toast({
-          type: "error",
-          description: error.message,
-        })
-      }
+      toast({
+        title: "خطأ في الدردشة",
+        description: error.message,
+        variant: "destructive",
+      })
     },
   })
 
-  const searchParams = useSearchParams()
-  const query = searchParams.get("query")
-
-  const [hasAppendedQuery, setHasAppendedQuery] = useState(false)
-
-  useEffect(() => {
-    if (query && !hasAppendedQuery) {
-      append({
-        id: generateUUID(),
-        role: "user",
-        content: query,
-      })
-
-      setHasAppendedQuery(true)
-      window.history.replaceState({}, "", `/chat/${id}`)
-    }
-  }, [query, append, hasAppendedQuery, id])
-
-  const { data: votes } = useSWR<Array<Vote>>(messages.length >= 2 ? `/api/vote?chatId=${id}` : null, fetcher)
-
-  const [attachments, setAttachments] = useState<Array<Attachment>>([])
-  const isArtifactVisible = useArtifactSelector((state) => state.isVisible)
-
-  useAutoResume({
-    autoResume,
-    initialMessages,
-    resumeStream: reload,
-    setMessages,
-  })
-
-  const sendMessage = async (message: ChatMessage) => {
-    await append({
-      id: message.id,
-      role: message.role,
-      content: message.parts
-        .filter((part) => part.type === "text")
-        .map((part) => part.text)
-        .join(""),
-    })
-  }
-
-  const regenerate = async () => {
-    if (messages.length === 0) return
-
-    const lastUserMessage = messages.filter((message) => message.role === "user").pop()
-
-    if (lastUserMessage) {
-      await reload()
-    }
-  }
-
   return (
-    <>
-      <div className="flex flex-col min-w-0 h-dvh bg-background">
-        <ChatHeader
-          chatId={id}
-          selectedModelId={initialChatModel}
-          selectedVisibilityType={initialVisibilityType}
-          isReadonly={isReadonly}
-          session={session}
-        />
+    <div className="flex flex-col h-screen max-w-4xl mx-auto p-4">
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-6 w-6 text-primary" />
+              <span>دكتور إكس - Dr.X AI</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                <span className="sr-only">تبديل الثيم</span>
+              </Button>
+              <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+            </div>
+          </CardTitle>
+        </CardHeader>
+      </Card>
 
-        <Messages
-          chatId={id}
-          status={isLoading ? "streaming" : "idle"}
-          votes={votes}
-          messages={messages}
-          setMessages={setMessages}
-          regenerate={regenerate}
-          isReadonly={isReadonly}
-          isArtifactVisible={isArtifactVisible}
-        />
-
-        <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
-          {!isReadonly && (
-            <MultimodalInput
-              chatId={id}
-              input={input}
-              setInput={setInput}
-              status={isLoading ? "streaming" : "idle"}
-              stop={stop}
-              attachments={attachments}
-              setAttachments={setAttachments}
-              messages={messages}
-              setMessages={setMessages}
-              sendMessage={sendMessage}
-              selectedVisibilityType={visibilityType}
-            />
+      <Card className="flex-1 flex flex-col">
+        <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+          {error && (
+            <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
+              <AlertCircle className="h-4 w-4" />
+              <span>خطأ: {error.message}</span>
+            </div>
           )}
-        </form>
-      </div>
 
-      <Artifact
-        chatId={id}
-        input={input}
-        setInput={setInput}
-        status={isLoading ? "streaming" : "idle"}
-        stop={stop}
-        attachments={attachments}
-        setAttachments={setAttachments}
-        sendMessage={sendMessage}
-        messages={messages}
-        setMessages={setMessages}
-        regenerate={regenerate}
-        votes={votes}
-        isReadonly={isReadonly}
-        selectedVisibilityType={visibilityType}
-      />
-    </>
+          {messages.length === 0 ? (
+            <div className="text-center text-muted-foreground py-8">
+              <Bot className="mx-auto h-12 w-12 mb-4 text-primary" />
+              <p className="text-lg mb-2">مرحباً! أنا دكتور إكس، مساعدك الذكي</p>
+              <p className="text-sm mb-6">Hello! I'm Dr. X, your AI assistant</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                <div className="p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer">
+                  <h3 className="font-medium mb-2">🧠 تحليل وتفكير</h3>
+                  <p className="text-sm text-muted-foreground">تحليل المشاكل والتفكير النقدي</p>
+                </div>
+                <div className="p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer">
+                  <h3 className="font-medium mb-2">💻 البرمجة والتقنية</h3>
+                  <p className="text-sm text-muted-foreground">مساعدة في الكود والتطوير</p>
+                </div>
+                <div className="p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer">
+                  <h3 className="font-medium mb-2">📝 الكتابة والتحرير</h3>
+                  <p className="text-sm text-muted-foreground">تحسين النصوص والمحتوى</p>
+                </div>
+                <div className="p-4 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer">
+                  <h3 className="font-medium mb-2">🎓 التعلم والتعليم</h3>
+                  <p className="text-sm text-muted-foreground">شرح المفاهيم والمساعدة في الدراسة</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex items-start space-x-3 ${
+                  message.role === "user" ? "flex-row-reverse space-x-reverse" : ""
+                }`}
+              >
+                <div className="flex-shrink-0">
+                  {message.role === "user" ? (
+                    <User className="h-8 w-8 p-1 bg-primary text-primary-foreground rounded-full" />
+                  ) : (
+                    <Bot className="h-8 w-8 p-1 bg-secondary text-secondary-foreground rounded-full" />
+                  )}
+                </div>
+                <div
+                  className={`flex-1 p-3 rounded-lg ${
+                    message.role === "user" ? "bg-primary text-primary-foreground ml-12" : "bg-muted mr-12"
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap">{message.content}</div>
+                </div>
+              </div>
+            ))
+          )}
+
+          {isLoading && (
+            <div className="flex items-start space-x-3">
+              <Bot className="h-8 w-8 p-1 bg-secondary text-secondary-foreground rounded-full" />
+              <div className="flex-1 p-3 rounded-lg bg-muted mr-12">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-current rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+                  <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+
+        <div className="p-4 border-t">
+          <form onSubmit={handleSubmit} className="flex space-x-2">
+            <Input
+              value={input}
+              onChange={handleInputChange}
+              placeholder="اكتب رسالتك هنا... / Type your message here..."
+              disabled={isLoading}
+              className="flex-1"
+              dir="auto"
+            />
+            <Button type="submit" disabled={isLoading || !input.trim()}>
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+        </div>
+      </Card>
+    </div>
   )
 }

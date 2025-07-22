@@ -1,16 +1,5 @@
-import { generateId } from 'ai';
-import { genSaltSync, hashSync } from 'bcrypt-ts';
+import { drizzle } from "drizzle-orm/neon-http"
+import { neon } from "@neondatabase/serverless"
 
-export function generateHashedPassword(password: string) {
-  const salt = genSaltSync(10);
-  const hash = hashSync(password, salt);
-
-  return hash;
-}
-
-export function generateDummyPassword() {
-  const password = generateId();
-  const hashedPassword = generateHashedPassword(password);
-
-  return hashedPassword;
-}
+const sql = neon(process.env.DATABASE_URL!)
+export const db = drizzle(sql)

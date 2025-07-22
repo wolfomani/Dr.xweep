@@ -1,57 +1,46 @@
-import { z } from 'zod';
-import type { getWeather } from './ai/tools/get-weather';
-import type { createDocument } from './ai/tools/create-document';
-import type { updateDocument } from './ai/tools/update-document';
-import type { requestSuggestions } from './ai/tools/request-suggestions';
-import type { InferUITool, UIMessage } from 'ai';
+export interface User {
+  id: string
+  email: string
+  name?: string
+  avatar?: string
+  createdAt: Date
+  updatedAt: Date
+}
 
-import type { ArtifactKind } from '@/components/artifact';
-import type { Suggestion } from './db/schema';
+export interface Chat {
+  id: string
+  title: string
+  userId: string
+  createdAt: Date
+  updatedAt: Date
+  messages: Message[]
+}
 
-export type DataPart = { type: 'append-message'; message: string };
+export interface Message {
+  id: string
+  chatId: string
+  role: "user" | "assistant" | "system"
+  content: string
+  createdAt: Date
+  metadata?: Record<string, any>
+}
 
-export const messageMetadataSchema = z.object({
-  createdAt: z.string(),
-});
+export interface AIModel {
+  id: string
+  name: string
+  provider: string
+  description?: string
+  maxTokens?: number
+  supportsImages?: boolean
+  supportsTools?: boolean
+}
 
-export type MessageMetadata = z.infer<typeof messageMetadataSchema>;
-
-type weatherTool = InferUITool<typeof getWeather>;
-type createDocumentTool = InferUITool<ReturnType<typeof createDocument>>;
-type updateDocumentTool = InferUITool<ReturnType<typeof updateDocument>>;
-type requestSuggestionsTool = InferUITool<
-  ReturnType<typeof requestSuggestions>
->;
-
-export type ChatTools = {
-  getWeather: weatherTool;
-  createDocument: createDocumentTool;
-  updateDocument: updateDocumentTool;
-  requestSuggestions: requestSuggestionsTool;
-};
-
-export type CustomUIDataTypes = {
-  textDelta: string;
-  imageDelta: string;
-  sheetDelta: string;
-  codeDelta: string;
-  suggestion: Suggestion;
-  appendMessage: string;
-  id: string;
-  title: string;
-  kind: ArtifactKind;
-  clear: null;
-  finish: null;
-};
-
-export type ChatMessage = UIMessage<
-  MessageMetadata,
-  CustomUIDataTypes,
-  ChatTools
->;
-
-export interface Attachment {
-  name: string;
-  url: string;
-  contentType: string;
+export interface Artifact {
+  id: string
+  type: "code" | "text" | "image" | "sheet"
+  title: string
+  content: string
+  language?: string
+  createdAt: Date
+  updatedAt: Date
 }
