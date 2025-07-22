@@ -6,7 +6,8 @@ export interface AIModel {
   capabilities: string[]
   maxTokens: number
   supportsArabic: boolean
-  reasoningType?: "deep" | "visual" | "analytical" | "creative"
+  reasoningType?: "deep" | "visual" | "analytical" | "creative" | "versatile"
+  apiEndpoint?: string
 }
 
 export const AVAILABLE_MODELS: AIModel[] = [
@@ -21,14 +22,36 @@ export const AVAILABLE_MODELS: AIModel[] = [
     reasoningType: "deep",
   },
   {
+    id: "llama-3.3-70b",
+    name: "Llama 3.3 70B",
+    provider: "groq",
+    description: "نموذج متعدد الاستخدامات وسريع الاستجابة",
+    capabilities: ["general_purpose", "fast_response", "multilingual", "arabic"],
+    maxTokens: 32768,
+    supportsArabic: true,
+    reasoningType: "versatile",
+  },
+  {
     id: "deepseek-reasoner",
     name: "DeepSeek Reasoner",
     provider: "deepseek",
-    description: "نموذج متخصص في التفكير المنطقي والاستنتاج",
+    description: "نموذج متخصص في التفكير المنطقي والاستنتاج العميق",
     capabilities: ["deep_reasoning", "logic", "mathematics", "coding", "arabic"],
     maxTokens: 64000,
     supportsArabic: true,
     reasoningType: "analytical",
+    apiEndpoint: "https://api.deepseek.com",
+  },
+  {
+    id: "deepseek-chat",
+    name: "DeepSeek Chat",
+    provider: "deepseek",
+    description: "نموذج محادثة متقدم من DeepSeek",
+    capabilities: ["conversation", "general_purpose", "coding", "arabic"],
+    maxTokens: 32000,
+    supportsArabic: true,
+    reasoningType: "creative",
+    apiEndpoint: "https://api.deepseek.com",
   },
   {
     id: "deepseek-v3",
@@ -39,16 +62,7 @@ export const AVAILABLE_MODELS: AIModel[] = [
     maxTokens: 128000,
     supportsArabic: true,
     reasoningType: "creative",
-  },
-  {
-    id: "gemini",
-    name: "Gemini Pro",
-    provider: "google",
-    description: "نموذج Google المتقدم للمحادثة والتحليل",
-    capabilities: ["multimodal", "analysis", "creative", "arabic", "visual"],
-    maxTokens: 32000,
-    supportsArabic: true,
-    reasoningType: "visual",
+    apiEndpoint: "https://api.together.xyz/v1",
   },
 ]
 
@@ -60,4 +74,8 @@ export function getModelById(id: string): AIModel | undefined {
 
 export function getModelsByProvider(provider: string): AIModel[] {
   return AVAILABLE_MODELS.filter((model) => model.provider === provider)
+}
+
+export function getReasoningModels(): AIModel[] {
+  return AVAILABLE_MODELS.filter((model) => model.reasoningType === "deep" || model.reasoningType === "analytical")
 }
