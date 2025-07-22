@@ -1,17 +1,16 @@
-const i18nConfig = {
+// This file is no longer needed for Next.js 15 App Router
+// Internationalization is handled differently in App Router
+
+const config = {
   defaultLocale: "en",
-  locales: ["ar", "bn", "de", "en", "es", "fr", "he", "id", "it", "ja", "ko", "pt", "ru", "si", "sv", "te", "vi", "zh"],
+  locales: ["en", "de"],
 }
 
-// Named export for i18n
-export const i18n = i18nConfig
+// Export for backward compatibility only
+module.exports = config
+module.exports.i18n = config
+module.exports.default = config
 
-// Default export
-export default i18nConfig
-
-// CommonJS compatibility for older imports
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = i18nConfig
-  module.exports.i18n = i18nConfig
-  module.exports.default = i18nConfig
-}
+// Named exports
+exports.i18n = config
+exports.default = config

@@ -222,7 +222,7 @@ importers:
         specifier: latest
         version: 0.6.1(@supabase/supabase-js@2.52.0(bufferutil@4.0.9))
       '@supabase/supabase-js':
-        specifier: latest
+        specifier: ^2.38.4
         version: 2.52.0(bufferutil@4.0.9)
       '@tabler/icons-react':
         specifier: ^2.40.0
@@ -470,9 +470,6 @@ importers:
       remark-math:
         specifier: ^6.0.0
         version: 6.0.0
-      resumable-stream:
-        specifier: latest
-        version: 2.2.1
       server-only:
         specifier: latest
         version: 0.0.1
@@ -8641,9 +8638,6 @@ packages:
     resolution: {integrity: sha512-6IzJLuGi4+R14vwagDHX+JrXmPVtPpn4mffDJ1UdR7/Edm87fl6yi8mMBIVvFtJaNTUvjughmW4hwLhRG7gC1Q==}
     engines: {node: '>=4'}
 
-  resumable-stream@2.2.1:
-    resolution: {integrity: sha512-8UOWqA+KjAOaZeeZa38lIhbNGM1B6ygO2QTi1BNcVO9vemQz1M0f2qVsnHqSnsLpJLfmOWNwq64TmBtOJxjCeQ==}
-
   retry@0.12.0:
     resolution: {integrity: sha512-9LkiTwjUh6rT555DtE9rTX+BKByPfrMzEAtnlEtdEwr3Nkffwiihqe2bWADg+OQRjt9gl6ICdmB/ZFDCGAtSow==}
     engines: {node: '>= 4'}
@@ -14258,7 +14252,7 @@ snapshots:
   '@types/glob@7.2.0':
     dependencies:
       '@types/minimatch': 6.0.0
-      '@types/node': 22.0.0
+      '@types/node': 22.16.5
 
   '@types/graceful-fs@4.1.9':
     dependencies:
@@ -14373,7 +14367,7 @@ snapshots:
 
   '@types/resolve@1.17.1':
     dependencies:
-      '@types/node': 22.0.0
+      '@types/node': 22.16.5
 
   '@types/retry@0.12.0': {}
 
@@ -14400,7 +14394,7 @@ snapshots:
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 22.0.0
+      '@types/node': 22.16.5
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -15992,7 +15986,7 @@ snapshots:
 
   dotenv-expand@11.0.7:
     dependencies:
-      dotenv: 16.4.7
+      dotenv: 16.6.1
 
   dotenv@16.4.7: {}
 
@@ -17865,7 +17859,7 @@ snapshots:
 
   jest-worker@26.6.2:
     dependencies:
-      '@types/node': 22.0.0
+      '@types/node': 22.16.5
       merge-stream: 2.0.0
       supports-color: 7.2.0
 
@@ -19904,7 +19898,7 @@ snapshots:
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.0
       '@types/long': 4.0.2
-      '@types/node': 22.0.0
+      '@types/node': 22.16.5
       long: 4.0.0
 
   proxy-from-env@1.1.0: {}
@@ -20349,8 +20343,6 @@ snapshots:
     dependencies:
       onetime: 2.0.1
       signal-exit: 3.0.7
-
-  resumable-stream@2.2.1: {}
 
   retry@0.12.0:
     optional: true

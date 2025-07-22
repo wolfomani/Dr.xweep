@@ -1,13 +1,7 @@
-const { i18n } = require("./i18nConfig")
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  i18n,
   reactStrictMode: true,
-  swcMinify: true,
-  experimental: {
-    serverComponentsExternalPackages: ["@supabase/ssr"],
-  },
+  serverExternalPackages: ["@supabase/ssr"],
   images: {
     remotePatterns: [
       { protocol: "http", hostname: "localhost" },
@@ -17,7 +11,6 @@ const nextConfig = {
     dangerouslyAllowSVG: true,
     contentDispositionType: "attachment",
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-    unoptimized: true, // Added from updates
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -26,12 +19,26 @@ const nextConfig = {
         fs: false,
         net: false,
         tls: false,
+        redis: false,
+        "resumable-stream": false,
       }
     }
+
+    // Fix for resumable-stream redis dependency
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      redis: false,
+      "resumable-stream": false,
+    }
+
+    // Ignore specific modules that cause issues
+    config.externals = config.externals || []
+    if (isServer) {
+      config.externals.push("redis")
+      config.externals.push("resumable-stream")
+    }
+
     return config
-  },
-  env: {
-    CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
   async headers() {
     return [
@@ -55,10 +62,10 @@ const nextConfig = {
     ]
   },
   eslint: {
-    ignoreDuringBuilds: true, // Added from updates
+    ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: true, // Added from updates
+    ignoreBuildErrors: true,
   },
 }
 

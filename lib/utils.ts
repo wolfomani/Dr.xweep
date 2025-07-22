@@ -1,156 +1,162 @@
-import type { CoreAssistantMessage, CoreToolMessage, UIMessage, UIMessagePart } from "ai"
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { DBMessage, Document } from "@/lib/db/schema"
-import { ChatSDKError, type ErrorCode } from "./errors"
-import type { ChatMessage, ChatTools, CustomUIDataTypes } from "./types"
-import { formatISO } from "date-fns"
+import { customAlphabet } from "nanoid"
+import type { Message } from "ai"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const fetcher = async (url: string) => {
-  const response = await fetch(url)
-
-  if (!response.ok) {
-    const { code, cause } = await response.json()
-    throw new ChatSDKError(code as ErrorCode, cause)
-  }
-
-  return response.json()
-}
-
-export async function fetchWithErrorHandlers(input: RequestInfo | URL, init?: RequestInit) {
-  try {
-    const response = await fetch(input, init)
-
-    if (!response.ok) {
-      const { code, cause } = await response.json()
-      throw new ChatSDKError(code as ErrorCode, cause)
-    }
-
-    return response
-  } catch (error: unknown) {
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      throw new ChatSDKError("offline:chat")
-    }
-
-    throw error
-  }
-}
-
-export function getLocalStorage(key: string) {
-  if (typeof window !== "undefined") {
-    return JSON.parse(localStorage.getItem(key) || "[]")
-  }
-  return []
-}
+export const nanoid = customAlphabet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", 7)
 
 export function generateUUID(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0
-    const v = c === "x" ? r : (r & 0x3) | 0x8
-    return v.toString(16)
-  })
+  return nanoid()
 }
 
-type ResponseMessageWithoutId = CoreToolMessage | CoreAssistantMessage
-type ResponseMessage = ResponseMessageWithoutId & { id: string }
+export function getBase64FromDataURL(dataURL: string): string {
+  try {
+    if (!dataURL || typeof dataURL !== "string") {
+      throw new Error("Invalid data URL")
+    }
 
-export function getMostRecentUserMessage(messages: Array<UIMessage>) {
+    const base64Index = dataURL.indexOf(",")
+    if (base64Index === -1) {
+      throw new Error("Invalid data URL format")
+    }
+
+    return dataURL.substring(base64Index + 1)
+  } catch (error) {
+    console.error("Error extracting base64 from data URL:", error)
+    return ""
+  }
+}
+
+export function getMediaTypeFromDataURL(dataURL: string): string {
+  try {
+    if (!dataURL || typeof dataURL !== "string") {
+      return "application/octet-stream"
+    }
+
+    const match = dataURL.match(/^data:([^;]+);/)
+    return match ? match[1] : "application/octet-stream"
+  } catch (error) {
+    console.error("Error extracting media type from data URL:", error)
+    return "application/octet-stream"
+  }
+}
+
+export function convertToUIMessages(messages: Array<any>): Message[] {
+  return messages.map((message) => ({
+    id: message.id,
+    role: message.role,
+    content: message.content || "",
+    parts: message.parts || [],
+    createdAt: message.createdAt,
+  }))
+}
+
+export function sanitizeResponseMessages(messages: Array<any>): Array<any> {
+  const messagesBySender = messages.reduce(
+    (acc, message) => {
+      if (!acc[message.role]) {
+        acc[message.role] = []
+      }
+      acc[message.role].push(message)
+      return acc
+    },
+    {} as Record<string, Array<any>>,
+  )
+
+  const sanitizedMessages = []
+
+  for (const role of ["user", "assistant"]) {
+    if (messagesBySender[role]) {
+      sanitizedMessages.push(...messagesBySender[role])
+    }
+  }
+
+  return sanitizedMessages
+}
+
+export function getMostRecentUserMessage(messages: Array<Message>) {
   const userMessages = messages.filter((message) => message.role === "user")
   return userMessages.at(-1)
 }
 
-export function getDocumentTimestampByIndex(documents: Array<Document>, index: number) {
-  if (!documents) return new Date()
-  if (index > documents.length) return new Date()
+export function getDocumentTimestampByIndex(documents: Array<any>, index: number) {
+  if (!documents[index]) {
+    return new Date()
+  }
 
   return documents[index].createdAt
 }
 
-export function getTrailingMessageId({
-  messages,
-}: {
-  messages: Array<ResponseMessage>
-}): string | null {
-  const trailingMessage = messages.at(-1)
+export function getMessageIdFromAnnotations(message: Message) {
+  if (!message.annotations) return message.id
 
-  if (!trailingMessage) return null
+  const [annotation] = message.annotations
+  if (!annotation) return message.id
 
-  return trailingMessage.id
+  return (annotation as any).messageIdFromServer || message.id
 }
 
-export function sanitizeText(text: string) {
-  return text.replace("<has_function_call>", "")
-}
+export function formatDate(date: Date | string | number): string {
+  try {
+    const dateObj = new Date(date)
+    if (isNaN(dateObj.getTime())) {
+      return "Invalid Date"
+    }
 
-export function convertToUIMessages(messages: DBMessage[]): ChatMessage[] {
-  return messages.map((message) => ({
-    id: message.id,
-    role: message.role as "user" | "assistant" | "system",
-    parts: message.parts as UIMessagePart<CustomUIDataTypes, ChatTools>[],
-    metadata: {
-      createdAt: formatISO(message.createdAt),
-    },
-  }))
-}
-
-export function getTextFromMessage(message: ChatMessage): string {
-  return message.parts
-    .filter((part) => part.type === "text")
-    .map((part) => part.text)
-    .join("")
-}
-
-// ✅ إضافة الدوال المفقودة
-export function getBase64FromDataURL(dataURL: string): string {
-  if (!dataURL || typeof dataURL !== "string") {
-    throw new Error("Invalid data URL provided")
+    return dateObj.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  } catch (error) {
+    console.error("Error formatting date:", error)
+    return "Invalid Date"
   }
-
-  const base64Index = dataURL.indexOf(",")
-  if (base64Index === -1) {
-    throw new Error("Invalid data URL format - missing comma separator")
-  }
-
-  return dataURL.substring(base64Index + 1)
 }
 
-export function getMediaTypeFromDataURL(dataURL: string): string {
-  if (!dataURL || typeof dataURL !== "string") {
-    return "application/octet-stream"
+export function formatTime(date: Date | string | number): string {
+  try {
+    const dateObj = new Date(date)
+    if (isNaN(dateObj.getTime())) {
+      return "Invalid Time"
+    }
+
+    return dateObj.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  } catch (error) {
+    console.error("Error formatting time:", error)
+    return "Invalid Time"
   }
-
-  const mediaTypeMatch = dataURL.match(/^data:([^;,]+)/)
-  return mediaTypeMatch ? mediaTypeMatch[1] : "application/octet-stream"
-}
-
-// دوال إضافية مفيدة للمشروع
-export function isValidDataURL(dataURL: string): boolean {
-  if (!dataURL || typeof dataURL !== "string") {
-    return false
-  }
-
-  return /^data:[^;,]+[;,]/.test(dataURL)
-}
-
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "0 Bytes"
-
-  const k = 1024
-  const sizes = ["Bytes", "KB", "MB", "GB"]
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-
-  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
 }
 
 export function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout
+  let timeout: NodeJS.Timeout | null = null
 
   return (...args: Parameters<T>) => {
-    clearTimeout(timeout)
-    timeout = setTimeout(() => func.apply(null, args), wait)
+    if (timeout) {
+      clearTimeout(timeout)
+    }
+
+    timeout = setTimeout(() => {
+      func(...args)
+    }, wait)
+  }
+}
+
+export function throttle<T extends (...args: any[]) => any>(func: T, limit: number): (...args: Parameters<T>) => void {
+  let inThrottle = false
+
+  return (...args: Parameters<T>) => {
+    if (!inThrottle) {
+      func(...args)
+      inThrottle = true
+      setTimeout(() => (inThrottle = false), limit)
+    }
   }
 }
