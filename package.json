@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "latest",
     "@ai-sdk/deepseek": "latest",
     "@ai-sdk/google": "latest",
     "@ai-sdk/groq": "latest",
@@ -16,7 +17,7 @@
     "@ai-sdk/react": "latest",
     "@ai-sdk/togetherai": "latest",
     "@ai-sdk/xai": "latest",
-    "@anthropic-ai/sdk": "latest",
+    "@anthropic-ai/sdk": "^0.18.0",
     "@apidevtools/json-schema-ref-parser": "latest",
     "@auth/core": "latest",
     "@aws-sdk/client-rds-data": "latest",
@@ -164,7 +165,6 @@
     "recharts": "latest",
     "remark-gfm": "latest",
     "remark-math": "^6.0.0",
-    "server-only": "latest",
     "sonner": "latest",
     "sql.js": "latest",
     "sqlite3": "latest",

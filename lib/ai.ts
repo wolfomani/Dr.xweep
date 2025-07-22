@@ -1,126 +1,123 @@
 import { openai } from "@ai-sdk/openai"
-import { anthropic } from "@anthropic-ai/sdk"
+import { anthropic } from "@ai-sdk/anthropic"
 import { google } from "@ai-sdk/google"
 import { groq } from "@ai-sdk/groq"
+import { xai } from "@ai-sdk/xai"
 
-// Custom model configuration
-export interface CustomModelConfig {
+// Custom model function
+export function customModel(modelId: string) {
+  // Parse provider and model from modelId
+  if (modelId.startsWith("gpt-") || modelId.startsWith("o1-")) {
+    return openai(modelId)
+  }
+
+  if (modelId.startsWith("claude-")) {
+    return anthropic(modelId)
+  }
+
+  if (modelId.startsWith("gemini-")) {
+    return google(modelId)
+  }
+
+  if (modelId.startsWith("llama") || modelId.startsWith("mixtral")) {
+    return groq(modelId)
+  }
+
+  if (modelId.startsWith("grok-")) {
+    return xai(modelId)
+  }
+
+  // Default fallback
+  return openai("gpt-4o")
+}
+
+// Model configurations
+export interface ModelConfig {
   id: string
   name: string
-  provider: "openai" | "anthropic" | "google" | "groq"
-  model: string
-  maxTokens?: number
-  temperature?: number
-  topP?: number
+  provider: string
+  maxTokens: number
+  supportsImages: boolean
+  supportsTools: boolean
 }
 
-// Default custom model
-export const customModel: CustomModelConfig = {
-  id: "custom-gpt-4o",
-  name: "Custom GPT-4o",
-  provider: "openai",
-  model: "gpt-4o",
-  maxTokens: 4096,
-  temperature: 0.7,
-  topP: 0.9,
-}
-
-// Available models
-export const availableModels: CustomModelConfig[] = [
+export const modelConfigs: ModelConfig[] = [
   {
     id: "gpt-4o",
     name: "GPT-4o",
     provider: "openai",
-    model: "gpt-4o",
-    maxTokens: 4096,
+    maxTokens: 128000,
+    supportsImages: true,
+    supportsTools: true,
   },
   {
     id: "gpt-4o-mini",
     name: "GPT-4o Mini",
     provider: "openai",
-    model: "gpt-4o-mini",
-    maxTokens: 16384,
+    maxTokens: 128000,
+    supportsImages: true,
+    supportsTools: true,
   },
   {
-    id: "claude-3-5-sonnet",
+    id: "o1-preview",
+    name: "O1 Preview",
+    provider: "openai",
+    maxTokens: 32768,
+    supportsImages: false,
+    supportsTools: false,
+  },
+  {
+    id: "claude-3-5-sonnet-20241022",
     name: "Claude 3.5 Sonnet",
     provider: "anthropic",
-    model: "claude-3-5-sonnet-20241022",
-    maxTokens: 8192,
+    maxTokens: 200000,
+    supportsImages: true,
+    supportsTools: true,
   },
   {
-    id: "gemini-pro",
-    name: "Gemini Pro",
+    id: "gemini-1.5-pro",
+    name: "Gemini 1.5 Pro",
     provider: "google",
-    model: "gemini-pro",
-    maxTokens: 2048,
+    maxTokens: 2097152,
+    supportsImages: true,
+    supportsTools: true,
   },
   {
-    id: "llama-3-70b",
-    name: "Llama 3 70B",
+    id: "llama-3.1-70b-versatile",
+    name: "Llama 3.1 70B",
     provider: "groq",
-    model: "llama3-70b-8192",
-    maxTokens: 8192,
+    maxTokens: 131072,
+    supportsImages: false,
+    supportsTools: true,
+  },
+  {
+    id: "grok-beta",
+    name: "Grok Beta",
+    provider: "xai",
+    maxTokens: 131072,
+    supportsImages: false,
+    supportsTools: true,
   },
 ]
 
-// Get model instance
-export function getModelInstance(config: CustomModelConfig) {
-  switch (config.provider) {
-    case "openai":
-      return openai(config.model)
-    case "anthropic":
-      return anthropic(config.model)
-    case "google":
-      return google(config.model)
-    case "groq":
-      return groq(config.model)
-    default:
-      return openai("gpt-4o")
-  }
+// Helper functions
+export function getModelById(id: string): ModelConfig | undefined {
+  return modelConfigs.find((model) => model.id === id)
 }
 
-// Find model by ID
-export function findModelById(id: string): CustomModelConfig | undefined {
-  return availableModels.find((model) => model.id === id)
+export function getModelsByProvider(provider: string): ModelConfig[] {
+  return modelConfigs.filter((model) => model.provider === provider)
 }
 
-// Validate model configuration
-export function validateModelConfig(config: CustomModelConfig): boolean {
-  return !!(
-    config.id &&
-    config.name &&
-    config.provider &&
-    config.model &&
-    ["openai", "anthropic", "google", "groq"].includes(config.provider)
-  )
+export function getDefaultModel(): ModelConfig {
+  return modelConfigs[0] // GPT-4o
 }
 
-// Create custom model configuration
-export function createCustomModel(
-  id: string,
-  name: string,
-  provider: CustomModelConfig["provider"],
-  model: string,
-  options?: Partial<Pick<CustomModelConfig, "maxTokens" | "temperature" | "topP">>,
-): CustomModelConfig {
-  return {
-    id,
-    name,
-    provider,
-    model,
-    maxTokens: options?.maxTokens || 4096,
-    temperature: options?.temperature || 0.7,
-    topP: options?.topP || 0.9,
-  }
-}
-
-// Export default configuration
+// Export for compatibility
 export default {
   customModel,
-  availableModels,
-  getModelInstance,
-  findModelById,
-  validateModelConfig,
-  createCustomModel,
+  modelConfigs,
+  getModelById,
+  getModelsByProvider,
+  getDefaultModel,
 }

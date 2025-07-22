@@ -1,393 +1,335 @@
-import { tool } from "ai"
 import { z } from "zod"
-import { saveDocument, getDocumentById } from "@/lib/db/queries"
+import { tool } from "ai"
 import { generateUUID } from "@/lib/utils"
+import { saveDocument, updateDocument as updateDocumentInDb, getDocumentById } from "@/lib/db/queries"
+import type { Session } from "next-auth"
 
-// Create Document Tool
-export const createDocument = tool({
-  description: "Create a new document with specified content and metadata",
-  parameters: z.object({
-    title: z.string().describe("The title of the document"),
-    content: z.string().describe("The content of the document"),
-    kind: z.enum(["text", "code", "image", "sheet"]).describe("The type of document"),
-    userId: z.string().optional().describe("The user ID who owns the document"),
-  }),
-  execute: async ({ title, content, kind, userId = "anonymous" }) => {
-    try {
-      const documentId = generateUUID()
-
-      const result = await saveDocument({
-        id: documentId,
-        title,
-        content,
-        kind: kind as any,
-        userId,
-      })
-
-      return {
-        success: true,
-        documentId,
-        message: `Document "${title}" created successfully`,
-        document: result[0],
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to create document",
-      }
-    }
-  },
-})
-
-// Update Document Tool
-export const updateDocument = tool({
-  description: "Update an existing document with new content",
-  parameters: z.object({
-    documentId: z.string().describe("The ID of the document to update"),
-    title: z.string().optional().describe("New title for the document"),
-    content: z.string().describe("New content for the document"),
-    kind: z.enum(["text", "code", "image", "sheet"]).optional().describe("New type of document"),
-  }),
-  execute: async ({ documentId, title, content, kind }) => {
-    try {
-      // First check if document exists
-      const existingDoc = await getDocumentById({ id: documentId })
-
-      if (!existingDoc) {
-        return {
-          success: false,
-          error: "Document not found",
-        }
-      }
-
-      // Create a new version of the document
-      const newDocumentId = generateUUID()
-
-      const result = await saveDocument({
-        id: newDocumentId,
-        title: title || existingDoc.title,
-        content,
-        kind: (kind || existingDoc.kind) as any,
-        userId: existingDoc.userId,
-      })
-
-      return {
-        success: true,
-        documentId: newDocumentId,
-        originalDocumentId: documentId,
-        message: `Document updated successfully`,
-        document: result[0],
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to update document",
-      }
-    }
-  },
-})
-
-// Get Weather Tool
+// Weather tool
 export const getWeather = tool({
-  description: "Get current weather information for a specified location",
+  description: "Get the current weather for a location",
   parameters: z.object({
-    location: z.string().describe("The city or location to get weather for"),
-    units: z.enum(["celsius", "fahrenheit"]).default("celsius").describe("Temperature units"),
+    latitude: z.number().describe("Latitude coordinate"),
+    longitude: z.number().describe("Longitude coordinate"),
   }),
-  execute: async ({ location, units }) => {
+  execute: async ({ latitude, longitude }) => {
     try {
-      // Mock weather data - in a real app, you'd call a weather API
+      // Mock weather data - in production, use a real weather API
       const weatherData = {
-        location,
-        temperature: units === "celsius" ? 22 : 72,
-        condition: "Partly cloudy",
-        humidity: 65,
-        windSpeed: units === "celsius" ? "15 km/h" : "9 mph",
-        units,
+        location: `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`,
+        temperature: Math.round(Math.random() * 30 + 10), // 10-40°C
+        condition: ["sunny", "cloudy", "rainy", "snowy"][Math.floor(Math.random() * 4)],
+        humidity: Math.round(Math.random() * 100),
+        windSpeed: Math.round(Math.random() * 20),
         timestamp: new Date().toISOString(),
       }
 
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
       return {
         success: true,
-        weather: weatherData,
-        message: `Current weather in ${location}: ${weatherData.temperature}°${units === "celsius" ? "C" : "F"}, ${weatherData.condition}`,
+        data: weatherData,
+        message: `Current weather at ${weatherData.location}: ${weatherData.temperature}°C, ${weatherData.condition}`,
       }
     } catch (error) {
+      console.error("Error fetching weather:", error)
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to get weather information",
+        error: "Failed to fetch weather data",
+        message: "Unable to retrieve weather information at this time.",
       }
     }
   },
 })
 
-// Request Suggestions Tool
-export const requestSuggestions = tool({
-  description: "Generate suggestions based on the current context or document",
-  parameters: z.object({
-    context: z.string().describe("The context or content to generate suggestions for"),
-    type: z.enum(["improvement", "completion", "alternative", "related"]).describe("Type of suggestions to generate"),
-    count: z.number().min(1).max(10).default(3).describe("Number of suggestions to generate"),
-    documentId: z.string().optional().describe("Document ID if suggestions are for a specific document"),
-  }),
-  execute: async ({ context, type, count, documentId }) => {
-    try {
-      // Generate mock suggestions based on type
-      const suggestionTemplates = {
-        improvement: [
-          "Consider adding more detailed explanations",
-          "You could improve readability by breaking this into smaller sections",
-          "Adding examples would make this clearer",
-          "Consider using more specific terminology",
-          "This could benefit from additional context",
-        ],
-        completion: [
-          "You might want to add a conclusion",
-          "Consider adding implementation details",
-          "This could use more examples",
-          "Adding error handling would be beneficial",
-          "Consider including performance considerations",
-        ],
-        alternative: [
-          "An alternative approach could be...",
-          "You could also consider...",
-          "Another way to handle this is...",
-          "A different perspective might be...",
-          "Alternatively, you could...",
-        ],
-        related: [
-          "This relates to the concept of...",
-          "You might also be interested in...",
-          "This connects to...",
-          "Similar ideas can be found in...",
-          "This builds upon...",
-        ],
+// Create document tool
+export function createDocument({
+  session,
+  dataStream,
+}: {
+  session: Session
+  dataStream?: any
+}) {
+  return tool({
+    description: "Create a new document with the given title and content",
+    parameters: z.object({
+      title: z.string().describe("The title of the document"),
+      content: z.string().optional().describe("Initial content for the document"),
+    }),
+    execute: async ({ title, content = "" }) => {
+      try {
+        if (!session?.user?.id) {
+          return {
+            success: false,
+            error: "User not authenticated",
+            message: "You must be logged in to create documents.",
+          }
+        }
+
+        const documentId = generateUUID()
+
+        const document = await saveDocument({
+          id: documentId,
+          title,
+          content,
+          userId: session.user.id,
+        })
+
+        // Notify data stream if available
+        if (dataStream) {
+          dataStream.writeData({
+            type: "document-created",
+            data: {
+              id: document.id,
+              title: document.title,
+              content: document.content,
+            },
+          })
+        }
+
+        return {
+          success: true,
+          data: {
+            id: document.id,
+            title: document.title,
+            content: document.content,
+            createdAt: document.createdAt,
+          },
+          message: `Document "${title}" created successfully.`,
+        }
+      } catch (error) {
+        console.error("Error creating document:", error)
+        return {
+          success: false,
+          error: "Failed to create document",
+          message: "Unable to create the document at this time.",
+        }
       }
+    },
+  })
+}
 
-      const templates = suggestionTemplates[type]
-      const suggestions = []
+// Update document tool
+export function updateDocument({
+  session,
+  dataStream,
+}: {
+  session: Session
+  dataStream?: any
+}) {
+  return tool({
+    description: "Update an existing document with new content",
+    parameters: z.object({
+      id: z.string().describe("The ID of the document to update"),
+      title: z.string().optional().describe("New title for the document"),
+      content: z.string().optional().describe("New content for the document"),
+    }),
+    execute: async ({ id, title, content }) => {
+      try {
+        if (!session?.user?.id) {
+          return {
+            success: false,
+            error: "User not authenticated",
+            message: "You must be logged in to update documents.",
+          }
+        }
 
-      for (let i = 0; i < Math.min(count, templates.length); i++) {
+        // Check if document exists and user owns it
+        const existingDocument = await getDocumentById({ id })
+
+        if (!existingDocument) {
+          return {
+            success: false,
+            error: "Document not found",
+            message: "The specified document could not be found.",
+          }
+        }
+
+        if (existingDocument.userId !== session.user.id) {
+          return {
+            success: false,
+            error: "Unauthorized",
+            message: "You don't have permission to update this document.",
+          }
+        }
+
+        const updatedDocument = await updateDocumentInDb({
+          id,
+          title,
+          content,
+        })
+
+        // Notify data stream if available
+        if (dataStream) {
+          dataStream.writeData({
+            type: "document-updated",
+            data: {
+              id: updatedDocument.id,
+              title: updatedDocument.title,
+              content: updatedDocument.content,
+            },
+          })
+        }
+
+        return {
+          success: true,
+          data: {
+            id: updatedDocument.id,
+            title: updatedDocument.title,
+            content: updatedDocument.content,
+            updatedAt: updatedDocument.updatedAt,
+          },
+          message: "Document updated successfully.",
+        }
+      } catch (error) {
+        console.error("Error updating document:", error)
+        return {
+          success: false,
+          error: "Failed to update document",
+          message: "Unable to update the document at this time.",
+        }
+      }
+    },
+  })
+}
+
+// Request suggestions tool
+export function requestSuggestions({
+  session,
+  dataStream,
+}: {
+  session: Session
+  dataStream?: any
+}) {
+  return tool({
+    description: "Generate suggestions for improving text or content",
+    parameters: z.object({
+      text: z.string().describe("The text to generate suggestions for"),
+      type: z
+        .enum(["grammar", "style", "clarity", "tone", "structure"])
+        .optional()
+        .describe("Type of suggestions to generate"),
+    }),
+    execute: async ({ text, type = "grammar" }) => {
+      try {
+        if (!session?.user?.id) {
+          return {
+            success: false,
+            error: "User not authenticated",
+            message: "You must be logged in to request suggestions.",
+          }
+        }
+
+        // Generate mock suggestions based on type
+        const suggestions = generateSuggestions(text, type)
+
+        // Notify data stream if available
+        if (dataStream) {
+          dataStream.writeData({
+            type: "suggestions-generated",
+            data: {
+              originalText: text,
+              suggestions,
+              type,
+            },
+          })
+        }
+
+        return {
+          success: true,
+          data: {
+            originalText: text,
+            suggestions,
+            type,
+            count: suggestions.length,
+          },
+          message: `Generated ${suggestions.length} ${type} suggestions.`,
+        }
+      } catch (error) {
+        console.error("Error generating suggestions:", error)
+        return {
+          success: false,
+          error: "Failed to generate suggestions",
+          message: "Unable to generate suggestions at this time.",
+        }
+      }
+    },
+  })
+}
+
+// Helper function to generate suggestions
+function generateSuggestions(text: string, type: string) {
+  const suggestions = []
+
+  switch (type) {
+    case "grammar":
+      // Mock grammar suggestions
+      if (text.includes("it's")) {
         suggestions.push({
           id: generateUUID(),
-          text: templates[i],
-          type,
-          relevance: Math.random() * 0.3 + 0.7, // Random relevance between 0.7-1.0
-          timestamp: new Date().toISOString(),
+          original: "it's",
+          suggested: "its",
+          reason: "Use 'its' for possession, 'it's' for 'it is'",
+          position: text.indexOf("it's"),
         })
       }
+      break
 
-      return {
-        success: true,
-        suggestions,
-        context: context.slice(0, 100) + (context.length > 100 ? "..." : ""),
-        type,
-        count: suggestions.length,
-        documentId,
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to generate suggestions",
-      }
-    }
-  },
-})
-
-// Additional utility tools
-export const searchDocuments = tool({
-  description: "Search for documents based on title or content",
-  parameters: z.object({
-    query: z.string().describe("Search query"),
-    userId: z.string().optional().describe("User ID to filter documents"),
-    limit: z.number().min(1).max(50).default(10).describe("Maximum number of results"),
-  }),
-  execute: async ({ query, userId, limit }) => {
-    try {
-      // Mock search results - in a real app, you'd implement full-text search
-      const mockResults = [
-        {
+    case "style":
+      // Mock style suggestions
+      if (text.includes("very")) {
+        suggestions.push({
           id: generateUUID(),
-          title: `Document containing "${query}"`,
-          content: `This document contains information about ${query}...`,
-          kind: "text",
-          userId: userId || "anonymous",
-          createdAt: new Date().toISOString(),
-          relevance: 0.95,
-        },
-        {
+          original: "very good",
+          suggested: "excellent",
+          reason: "Use stronger adjectives instead of 'very + adjective'",
+          position: text.indexOf("very"),
+        })
+      }
+      break
+
+    case "clarity":
+      // Mock clarity suggestions
+      if (text.length > 100) {
+        suggestions.push({
           id: generateUUID(),
-          title: `Related to ${query}`,
-          content: `Additional information related to ${query}...`,
-          kind: "text",
-          userId: userId || "anonymous",
-          createdAt: new Date().toISOString(),
-          relevance: 0.87,
-        },
-      ]
-
-      return {
-        success: true,
-        results: mockResults.slice(0, limit),
-        query,
-        totalFound: mockResults.length,
-        limit,
+          original: text.substring(0, 50) + "...",
+          suggested: "Consider breaking this into shorter sentences",
+          reason: "Long sentences can be hard to follow",
+          position: 0,
+        })
       }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to search documents",
+      break
+
+    case "tone":
+      // Mock tone suggestions
+      if (text.includes("!")) {
+        suggestions.push({
+          id: generateUUID(),
+          original: "!",
+          suggested: ".",
+          reason: "Consider using periods for a more professional tone",
+          position: text.indexOf("!"),
+        })
       }
-    }
-  },
-})
+      break
 
-export const analyzeText = tool({
-  description: "Analyze text for various metrics and insights",
-  parameters: z.object({
-    text: z.string().describe("Text to analyze"),
-    analysisType: z.enum(["readability", "sentiment", "keywords", "summary"]).describe("Type of analysis to perform"),
-  }),
-  execute: async ({ text, analysisType }) => {
-    try {
-      const wordCount = text.split(/\s+/).length
-      const charCount = text.length
-      const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0).length
+    case "structure":
+      // Mock structure suggestions
+      suggestions.push({
+        id: generateUUID(),
+        original: text,
+        suggested: "Consider adding topic sentences to improve structure",
+        reason: "Clear structure helps readers follow your ideas",
+        position: 0,
+      })
+      break
+  }
 
-      let analysis = {}
-
-      switch (analysisType) {
-        case "readability":
-          analysis = {
-            wordCount,
-            charCount,
-            sentences,
-            avgWordsPerSentence: Math.round(wordCount / sentences),
-            readingTime: Math.ceil(wordCount / 200), // Assuming 200 words per minute
-            complexity: wordCount > 1000 ? "high" : wordCount > 500 ? "medium" : "low",
-          }
-          break
-
-        case "sentiment":
-          // Mock sentiment analysis
-          const positiveWords = ["good", "great", "excellent", "amazing", "wonderful", "fantastic"]
-          const negativeWords = ["bad", "terrible", "awful", "horrible", "disappointing"]
-
-          const positive = positiveWords.filter((word) => text.toLowerCase().includes(word)).length
-          const negative = negativeWords.filter((word) => text.toLowerCase().includes(word)).length
-
-          analysis = {
-            sentiment: positive > negative ? "positive" : negative > positive ? "negative" : "neutral",
-            confidence: Math.abs(positive - negative) / Math.max(positive + negative, 1),
-            positiveWords: positive,
-            negativeWords: negative,
-          }
-          break
-
-        case "keywords":
-          // Simple keyword extraction
-          const words = text.toLowerCase().match(/\b\w{4,}\b/g) || []
-          const frequency: Record<string, number> = {}
-
-          words.forEach((word) => {
-            frequency[word] = (frequency[word] || 0) + 1
-          })
-
-          const keywords = Object.entries(frequency)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 10)
-            .map(([word, count]) => ({ word, count }))
-
-          analysis = {
-            keywords,
-            totalUniqueWords: Object.keys(frequency).length,
-            mostFrequent: keywords[0]?.word || "none",
-          }
-          break
-
-        case "summary":
-          // Simple extractive summary (first and last sentences)
-          const sentenceArray = text.split(/[.!?]+/).filter((s) => s.trim().length > 0)
-          const summary =
-            sentenceArray.length > 2
-              ? `${sentenceArray[0].trim()}. ... ${sentenceArray[sentenceArray.length - 1].trim()}.`
-              : text
-
-          analysis = {
-            summary,
-            originalLength: charCount,
-            summaryLength: summary.length,
-            compressionRatio: Math.round((summary.length / charCount) * 100),
-          }
-          break
-      }
-
-      return {
-        success: true,
-        analysisType,
-        analysis,
-        metadata: {
-          wordCount,
-          charCount,
-          sentences,
-          timestamp: new Date().toISOString(),
-        },
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to analyze text",
-      }
-    }
-  },
-})
+  return suggestions
+}
 
 // Export all tools
-export const tools = {
+export default {
+  getWeather,
   createDocument,
   updateDocument,
-  getWeather,
   requestSuggestions,
-  searchDocuments,
-  analyzeText,
 }
-
-// Export tool configurations
-export const toolConfigs = {
-  createDocument: {
-    name: "Create Document",
-    description: "Create new documents with various content types",
-    category: "document",
-  },
-  updateDocument: {
-    name: "Update Document",
-    description: "Modify existing documents",
-    category: "document",
-  },
-  getWeather: {
-    name: "Get Weather",
-    description: "Retrieve current weather information",
-    category: "utility",
-  },
-  requestSuggestions: {
-    name: "Request Suggestions",
-    description: "Generate contextual suggestions",
-    category: "ai",
-  },
-  searchDocuments: {
-    name: "Search Documents",
-    description: "Find documents by content or title",
-    category: "search",
-  },
-  analyzeText: {
-    name: "Analyze Text",
-    description: "Perform various text analysis operations",
-    category: "analysis",
-  },
-}
-
-// Default export
-export default tools
