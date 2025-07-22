@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://dr3q.vercel.app'),
   title: 'dr.x',
   description: 'Next.js chatbot template using the dr.x.',
+    generator: 'v0.dev'
 };
 
 export const viewport = {

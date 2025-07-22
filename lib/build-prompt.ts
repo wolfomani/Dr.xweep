@@ -257,4 +257,3 @@ export async function adaptMessagesForGoogleGemini(
   }
   return geminiMessages
 }
-
