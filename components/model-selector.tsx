@@ -1,88 +1,105 @@
-"use client"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Brain, Zap, Sparkles, Eye, Gauge } from "lucide-react"
-import { AVAILABLE_MODELS, type AIModel } from "@/lib/ai/models"
+'use client';
 
-const getReasoningIcon = (type?: AIModel["reasoningType"]) => {
-  switch (type) {
-    case "deep":
-      return <Brain className="w-4 h-4 text-purple-400" />
-    case "analytical":
-      return <Zap className="w-4 h-4 text-blue-400" />
-    case "creative":
-      return <Sparkles className="w-4 h-4 text-yellow-400" />
-    case "visual":
-      return <Eye className="w-4 h-4 text-green-400" />
-    case "versatile":
-      return <Gauge className="w-4 h-4 text-orange-400" />
-    default:
-      return <Brain className="w-4 h-4" />
-  }
-}
+import { startTransition, useMemo, useOptimistic, useState } from 'react';
 
-const getProviderColor = (provider: string) => {
-  switch (provider) {
-    case "groq":
-      return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
-    case "deepseek":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-    case "together":
-      return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-    default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
-  }
-}
+import { saveChatModelAsCookie } from '@/app/(chat)/actions';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { chatModels } from '@/lib/ai/models';
+import { cn } from '@/lib/utils';
+
+import { CheckCircleFillIcon, ChevronDownIcon } from './icons';
+import { entitlementsByUserType } from '@/lib/ai/entitlements';
+import type { Session } from 'next-auth';
 
 export function ModelSelector({
+  session,
   selectedModelId,
-  onModelChange,
   className,
 }: {
-  selectedModelId: string
-  onModelChange?: (modelId: string) => void
-  className?: string
-}) {
-  const selectedModel = AVAILABLE_MODELS.find((m) => m.id === selectedModelId)
+  session: Session;
+  selectedModelId: string;
+} & React.ComponentProps<typeof Button>) {
+  const [open, setOpen] = useState(false);
+  const [optimisticModelId, setOptimisticModelId] =
+    useOptimistic(selectedModelId);
+
+  const userType = session.user.type;
+  const { availableChatModelIds } = entitlementsByUserType[userType];
+
+  const availableChatModels = chatModels.filter((chatModel) =>
+    availableChatModelIds.includes(chatModel.id),
+  );
+
+  const selectedChatModel = useMemo(
+    () =>
+      availableChatModels.find(
+        (chatModel) => chatModel.id === optimisticModelId,
+      ),
+    [optimisticModelId, availableChatModels],
+  );
 
   return (
-    <div className={className}>
-      <Select value={selectedModelId} onValueChange={onModelChange}>
-        <SelectTrigger className="w-[250px] bg-gray-900 border-gray-700 text-white">
-          <SelectValue>
-            <div className="flex items-center gap-2">
-              {selectedModel && getReasoningIcon(selectedModel.reasoningType)}
-              <span className="text-sm">{selectedModel?.name || "اختر النموذج"}</span>
-            </div>
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent className="bg-gray-900 border-gray-700 max-h-80">
-          {AVAILABLE_MODELS.map((model) => (
-            <SelectItem key={model.id} value={model.id} className="text-white hover:bg-gray-800">
-              <div className="flex flex-col gap-2 py-2">
-                <div className="flex items-center gap-2">
-                  {getReasoningIcon(model.reasoningType)}
-                  <span className="font-medium">{model.name}</span>
-                  <Badge variant="secondary" className={`text-xs ${getProviderColor(model.provider)}`}>
-                    {model.provider}
-                  </Badge>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger
+        asChild
+        className={cn(
+          'w-fit data-[state=open]:bg-accent data-[state=open]:text-accent-foreground',
+          className,
+        )}
+      >
+        <Button
+          data-testid="model-selector"
+          variant="outline"
+          className="md:px-2 md:h-[34px]"
+        >
+          {selectedChatModel?.name}
+          <ChevronDownIcon />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-[300px]">
+        {availableChatModels.map((chatModel) => {
+          const { id } = chatModel;
+
+          return (
+            <DropdownMenuItem
+              data-testid={`model-selector-item-${id}`}
+              key={id}
+              onSelect={() => {
+                setOpen(false);
+
+                startTransition(() => {
+                  setOptimisticModelId(id);
+                  saveChatModelAsCookie(id);
+                });
+              }}
+              data-active={id === optimisticModelId}
+              asChild
+            >
+              <button
+                type="button"
+                className="gap-4 group/item flex flex-row justify-between items-center w-full"
+              >
+                <div className="flex flex-col gap-1 items-start">
+                  <div>{chatModel.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {chatModel.description}
+                  </div>
                 </div>
-                <p className="text-xs text-gray-400 text-right max-w-[200px]">{model.description}</p>
-                <div className="flex gap-1 mt-1 flex-wrap">
-                  {model.capabilities.slice(0, 3).map((cap) => (
-                    <Badge key={cap} variant="outline" className="text-xs">
-                      {cap}
-                    </Badge>
-                  ))}
-                  <Badge variant="outline" className="text-xs">
-                    {Math.round(model.maxTokens / 1000)}K tokens
-                  </Badge>
+
+                <div className="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100">
+                  <CheckCircleFillIcon />
                 </div>
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  )
+              </button>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }

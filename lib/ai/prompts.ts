@@ -1,117 +1,121 @@
-export interface ReasoningGoal {
-  type: "analysis" | "problem_solving" | "visual_explanation" | "step_by_step" | "mathematical" | "creative"
-  description: string
-  language: "ar" | "en"
-  complexity: "simple" | "medium" | "complex" | "expert"
+import type { ArtifactKind } from '@/components/artifact';
+import type { Geo } from '@vercel/functions';
+
+export const artifactsPrompt = `
+Artifacts is a special user interface mode that helps users with writing, editing, and other content creation tasks. When artifact is open, it is on the right side of the screen, while the conversation is on the left side. When creating or updating documents, changes are reflected in real-time on the artifacts and visible to the user.
+
+When asked to write code, always use artifacts. When writing code, specify the language in the backticks, e.g. \`\`\`python\`code here\`\`\`. The default language is Python. Other languages are not yet supported, so let the user know if they request a different language.
+
+DO NOT UPDATE DOCUMENTS IMMEDIATELY AFTER CREATING THEM. WAIT FOR USER FEEDBACK OR REQUEST TO UPDATE IT.
+
+This is a guide for using artifacts tools: \`createDocument\` and \`updateDocument\`, which render content on a artifacts beside the conversation.
+
+**When to use \`createDocument\`:**
+- For substantial content (>10 lines) or code
+- For content users will likely save/reuse (emails, code, essays, etc.)
+- When explicitly requested to create a document
+- For when content contains a single code snippet
+
+**When NOT to use \`createDocument\`:**
+- For informational/explanatory content
+- For conversational responses
+- When asked to keep it in chat
+
+**Using \`updateDocument\`:**
+- Default to full document rewrites for major changes
+- Use targeted updates only for specific, isolated changes
+- Follow user instructions for which parts to modify
+
+**When NOT to use \`updateDocument\`:**
+- Immediately after creating a document
+
+Do not update document right after creating it. Wait for user feedback or request to update it.
+`;
+
+export const regularPrompt =
+  'You are a friendly assistant! Keep your responses concise and helpful.';
+
+export interface RequestHints {
+  latitude: Geo['latitude'];
+  longitude: Geo['longitude'];
+  city: Geo['city'];
+  country: Geo['country'];
 }
 
-export const buildAdvancedReasoningPrompt = (messages: any[], goal: ReasoningGoal) => {
-  const complexityInstructions = {
-    ar: {
-      simple: "استخدم 5-8 خطوات للحل",
-      medium: "استخدم 10-15 خطوة للحل",
-      complex: "استخدم 15-20 خطوة للحل",
-      expert: "استخدم 20+ خطوة مع تحليل عميق",
-    },
-    en: {
-      simple: "Use 5-8 steps for the solution",
-      medium: "Use 10-15 steps for the solution",
-      complex: "Use 15-20 steps for the solution",
-      expert: "Use 20+ steps with deep analysis",
-    },
+export const getRequestPromptFromHints = (requestHints: RequestHints) => `\
+About the origin of user's request:
+- lat: ${requestHints.latitude}
+- lon: ${requestHints.longitude}
+- city: ${requestHints.city}
+- country: ${requestHints.country}
+`;
+
+export const systemPrompt = ({
+  selectedChatModel,
+  requestHints,
+}: {
+  selectedChatModel: string;
+  requestHints: RequestHints;
+}) => {
+  const requestPrompt = getRequestPromptFromHints(requestHints);
+
+  if (selectedChatModel === 'chat-model-reasoning') {
+    return `${regularPrompt}\n\n${requestPrompt}`;
+  } else {
+    return `${regularPrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;
   }
+};
 
-  const typeInstructions = {
-    ar: {
-      analysis: "🔍 ركز على التحليل العميق والفهم الشامل",
-      problem_solving: "🧩 ركز على إيجاد حلول عملية ومنطقية",
-      visual_explanation: "👁️ ركز على الشرح المرئي والتوضيح",
-      step_by_step: "📋 ركز على التسلسل المنطقي للخطوات",
-      mathematical: "🧮 ركز على الدقة الرياضية والبراهين",
-      creative: "✨ ركز على الإبداع والابتكار",
-    },
-    en: {
-      analysis: "🔍 Focus on deep analysis and comprehensive understanding",
-      problem_solving: "🧩 Focus on finding practical and logical solutions",
-      visual_explanation: "👁️ Focus on visual explanation and clarification",
-      step_by_step: "📋 Focus on logical sequence of steps",
-      mathematical: "🧮 Focus on mathematical precision and proofs",
-      creative: "✨ Focus on creativity and innovation",
-    },
-  }
+export const codePrompt = `
+You are a Python code generator that creates self-contained, executable code snippets. When writing code:
 
-  const lang = goal.language
-  const instruction = typeInstructions[lang][goal.type]
-  const complexity = complexityInstructions[lang][goal.complexity]
+1. Each snippet should be complete and runnable on its own
+2. Prefer using print() statements to display outputs
+3. Include helpful comments explaining the code
+4. Keep snippets concise (generally under 15 lines)
+5. Avoid external dependencies - use Python standard library
+6. Handle potential errors gracefully
+7. Return meaningful output that demonstrates the code's functionality
+8. Don't use input() or other interactive functions
+9. Don't access files or network resources
+10. Don't use infinite loops
 
-  return [
-    {
-      role: "system",
-      content: `${instruction}\n${complexity}\n\n${goal.description}`,
-    },
-    ...messages,
-  ]
-}
+Examples of good snippets:
 
-export const REASONING_TEMPLATES = {
-  mathematical: {
-    ar: `
-<تفكير>
-المسألة الرياضية تتطلب تحليل دقيق للمعطيات والمطلوب.
-</تفكير>
+# Calculate factorial iteratively
+def factorial(n):
+    result = 1
+    for i in range(1, n + 1):
+        result *= i
+    return result
 
-<خطوة>
-الخطوة 1: تحديد المعطيات والمطلوب
-<عدد>19</عدد>
-</خطوة>
+print(f"Factorial of 5 is: {factorial(5)}")
+`;
 
-<معادلة>
-$$المعادلة الأساسية$$
-</معادلة>
+export const sheetPrompt = `
+You are a spreadsheet creation assistant. Create a spreadsheet in csv format based on the given prompt. The spreadsheet should contain meaningful column headers and data.
+`;
 
-<تأمل>
-هل المعادلة صحيحة؟ هل المنطق سليم؟
-</تأمل>
+export const updateDocumentPrompt = (
+  currentContent: string | null,
+  type: ArtifactKind,
+) =>
+  type === 'text'
+    ? `\
+Improve the following contents of the document based on the given prompt.
 
-<مكافأة>0.8</مكافأة>
-    `,
-    en: `
-<Thinking>
-The mathematical problem requires precise analysis of given data and requirements.
-</Thinking>
+${currentContent}
+`
+    : type === 'code'
+      ? `\
+Improve the following code snippet based on the given prompt.
 
-<step>
-Step 1: Identify given data and requirements
-<count>19</count>
-</step>
+${currentContent}
+`
+      : type === 'sheet'
+        ? `\
+Improve the following spreadsheet based on the given prompt.
 
-<equation>
-$$Basic equation$$
-</equation>
-
-<reflection>
-Is the equation correct? Is the logic sound?
-</reflection>
-
-<reward>0.8</reward>
-    `,
-  },
-  problem_solving: {
-    ar: `
-<تفكير>
-المشكلة تحتاج إلى فهم عميق وتحليل شامل قبل البدء في الحل.
-</تفكير>
-
-<خطوة>
-الخطوة 1: تحليل المشكلة وتحديد العوامل المؤثرة
-<عدد>15</عدد>
-</خطوة>
-
-<تأمل>
-هل فهمت المشكلة بشكل صحيح؟ هل هناك عوامل مخفية؟
-</تأمل>
-
-<مكافأة>0.7</مكافأة>
-    `,
-  },
-}
+${currentContent}
+`
+        : '';
