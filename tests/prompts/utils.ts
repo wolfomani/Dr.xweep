@@ -13,75 +13,157 @@ export interface TestChunk {
 }
 
 export function getResponseChunksByPrompt(prompt: any, withReasoning = false): TestChunk[] {
-  // Extract text from prompt for response generation
-  const promptText = typeof prompt === "string" ? prompt : JSON.stringify(prompt)
+  // Convert prompt to string if it's an object or array
+  const promptText =
+    typeof prompt === "string"
+      ? prompt
+      : Array.isArray(prompt)
+        ? prompt.map((p) => (typeof p === "string" ? p : p.content || "")).join(" ")
+        : JSON.stringify(prompt)
 
-  const baseChunks: TestChunk[] = [
-    { id: "1", type: "text-start" },
-    { id: "1", type: "text-delta", delta: "Hello! " },
-    { id: "1", type: "text-delta", delta: "I understand your request. " },
-    { id: "1", type: "text-delta", delta: "Let me help you with that." },
-    { id: "1", type: "text-end" },
-    {
-      id: "1",
-      type: "finish",
-      finishReason: "stop",
-      usage: { inputTokens: 10, outputTokens: 20, totalTokens: 30 },
-    },
-  ]
+  // Generate appropriate response based on prompt content
+  let responseText = "Hello! How can I help you today?"
+
+  if (promptText.toLowerCase().includes("code")) {
+    responseText = 'Here\'s a code example:\n\n```javascript\nconsole.log("Hello, World!");\n```'
+  } else if (promptText.toLowerCase().includes("weather")) {
+    responseText = "The current weather is sunny with a temperature of 22°C."
+  } else if (promptText.toLowerCase().includes("help")) {
+    responseText = "I'm here to help! What would you like assistance with?"
+  } else if (promptText.toLowerCase().includes("explain")) {
+    responseText = "Let me explain this concept step by step..."
+  }
 
   if (withReasoning) {
-    return [
-      { id: "1", type: "text-start" },
-      { id: "1", type: "text-delta", delta: "Let me think about this... " },
-      { id: "1", type: "text-delta", delta: "Analyzing the request... " },
-      { id: "1", type: "text-delta", delta: "Based on my analysis, " },
-      { id: "1", type: "text-delta", delta: "here is my response: " },
-      { id: "1", type: "text-delta", delta: "Hello! I understand your request and will help you." },
-      { id: "1", type: "text-end" },
-      {
-        id: "1",
-        type: "finish",
-        finishReason: "stop",
-        usage: { inputTokens: 15, outputTokens: 35, totalTokens: 50 },
-      },
-    ]
+    responseText = `Let me think about this step by step:
+
+1. First, I need to understand what you're asking
+2. Then, I'll analyze the key components
+3. Finally, I'll provide a comprehensive answer
+
+${responseText}`
   }
 
-  // Customize response based on prompt content
-  if (promptText.toLowerCase().includes("code")) {
-    return [
-      { id: "1", type: "text-start" },
-      { id: "1", type: "text-delta", delta: "Here is the code you requested:\n\n" },
-      { id: "1", type: "text-delta", delta: "```javascript\n" },
-      { id: "1", type: "text-delta", delta: 'console.log("Hello, World!");\n' },
-      { id: "1", type: "text-delta", delta: "```" },
-      { id: "1", type: "text-end" },
-      {
-        id: "1",
-        type: "finish",
-        finishReason: "stop",
-        usage: { inputTokens: 8, outputTokens: 25, totalTokens: 33 },
-      },
-    ]
+  // Split response into chunks for streaming simulation
+  const words = responseText.split(" ")
+  const chunks: TestChunk[] = []
+
+  // Add start chunk
+  chunks.push({
+    id: "1",
+    type: "text-start",
+  })
+
+  // Add delta chunks for each word
+  words.forEach((word, index) => {
+    chunks.push({
+      id: "1",
+      type: "text-delta",
+      delta: (index === 0 ? "" : " ") + word,
+    })
+  })
+
+  // Add end chunk
+  chunks.push({
+    id: "1",
+    type: "text-end",
+  })
+
+  // Add finish chunk
+  chunks.push({
+    id: "1",
+    type: "finish",
+    finishReason: "stop",
+    usage: {
+      inputTokens: Math.ceil(promptText.length / 4),
+      outputTokens: Math.ceil(responseText.length / 4),
+      totalTokens: Math.ceil((promptText.length + responseText.length) / 4),
+    },
+  })
+
+  return chunks
+}
+
+export function generateTestPrompt(type: "simple" | "complex" | "code" | "reasoning" = "simple"): string {
+  const prompts = {
+    simple: "Hello, how are you?",
+    complex: "Can you explain the concept of machine learning and provide some practical examples?",
+    code: "Write a JavaScript function that calculates the factorial of a number",
+    reasoning: "What are the pros and cons of renewable energy sources?",
   }
 
-  if (promptText.toLowerCase().includes("weather")) {
-    return [
-      { id: "1", type: "text-start" },
-      { id: "1", type: "text-delta", delta: "Let me check the weather for you. " },
-      { id: "1", type: "text-delta", delta: "The current weather is sunny with 22°C." },
-      { id: "1", type: "text-end" },
-      {
-        id: "1",
-        type: "finish",
-        finishReason: "stop",
-        usage: { inputTokens: 12, outputTokens: 18, totalTokens: 30 },
-      },
-    ]
+  return prompts[type]
+}
+
+export function createMockMessage(content: string, role: "user" | "assistant" | "system" = "user") {
+  return {
+    id: Math.random().toString(36).substring(7),
+    role,
+    content,
+    createdAt: new Date().toISOString(),
+  }
+}
+
+export function createMockConversation(length = 3) {
+  const conversation = []
+
+  for (let i = 0; i < length; i++) {
+    if (i % 2 === 0) {
+      conversation.push(createMockMessage(`User message ${i + 1}`, "user"))
+    } else {
+      conversation.push(createMockMessage(`Assistant response ${i + 1}`, "assistant"))
+    }
   }
 
-  return baseChunks
+  return conversation
+}
+
+export function simulateTypingDelay(text: string, delayPerChar = 50): Promise<string> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(text)
+    }, text.length * delayPerChar)
+  })
+}
+
+export function validateChunkSequence(chunks: TestChunk[]): boolean {
+  if (chunks.length === 0) return false
+
+  const hasStart = chunks.some((chunk) => chunk.type === "text-start")
+  const hasEnd = chunks.some((chunk) => chunk.type === "text-end")
+  const hasFinish = chunks.some((chunk) => chunk.type === "finish")
+
+  return hasStart && hasEnd && hasFinish
+}
+
+export function extractTextFromChunks(chunks: TestChunk[]): string {
+  return chunks
+    .filter((chunk) => chunk.type === "text-delta" && chunk.delta)
+    .map((chunk) => chunk.delta)
+    .join("")
+}
+
+export function calculateTokenUsage(text: string): { inputTokens: number; outputTokens: number; totalTokens: number } {
+  // Simple token estimation (roughly 4 characters per token)
+  const tokens = Math.ceil(text.length / 4)
+
+  return {
+    inputTokens: tokens,
+    outputTokens: tokens,
+    totalTokens: tokens * 2,
+  }
+}
+
+// Export default utilities
+export default {
+  getResponseChunksByPrompt,
+  generateTestPrompt,
+  createMockMessage,
+  createMockConversation,
+  simulateTypingDelay,
+  validateChunkSequence,
+  extractTextFromChunks,
+  calculateTokenUsage,
 }
 
 export function createMockStreamResult(chunks: TestChunk[]): Partial<StreamTextResult> {
@@ -101,49 +183,6 @@ export function createMockStreamResult(chunks: TestChunk[]): Partial<StreamTextR
     ),
     finishReason: Promise.resolve(chunks.find((chunk) => chunk.type === "finish")?.finishReason || "stop"),
   }
-}
-
-export function simulateTypingDelay(text: string, delayMs = 50): TestChunk[] {
-  const chunks: TestChunk[] = [{ id: "1", type: "text-start" }]
-
-  // Split text into words for more realistic typing simulation
-  const words = text.split(" ")
-
-  words.forEach((word, index) => {
-    chunks.push({
-      id: "1",
-      type: "text-delta",
-      delta: index === 0 ? word : ` ${word}`,
-    })
-  })
-
-  chunks.push({ id: "1", type: "text-end" })
-  chunks.push({
-    id: "1",
-    type: "finish",
-    finishReason: "stop",
-    usage: {
-      inputTokens: Math.floor(text.length / 4),
-      outputTokens: Math.floor(text.length / 3),
-      totalTokens: Math.floor(text.length / 2),
-    },
-  })
-
-  return chunks
-}
-
-export function createErrorChunk(error: string): TestChunk[] {
-  return [
-    { id: "1", type: "text-start" },
-    { id: "1", type: "text-delta", delta: `Error: ${error}` },
-    { id: "1", type: "text-end" },
-    {
-      id: "1",
-      type: "finish",
-      finishReason: "stop",
-      usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 },
-    },
-  ]
 }
 
 // Helper function for testing different scenarios
@@ -166,4 +205,18 @@ export function getChunksByScenario(scenario: string): TestChunk[] {
     default:
       return getResponseChunksByPrompt("default prompt")
   }
+}
+
+export function createErrorChunk(error: string): TestChunk[] {
+  return [
+    { id: "1", type: "text-start" },
+    { id: "1", type: "text-delta", delta: `Error: ${error}` },
+    { id: "1", type: "text-end" },
+    {
+      id: "1",
+      type: "finish",
+      finishReason: "stop",
+      usage: { inputTokens: 5, outputTokens: 10, totalTokens: 15 },
+    },
+  ]
 }
